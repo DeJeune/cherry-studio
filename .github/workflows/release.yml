@@ -63,6 +63,39 @@ jobs:
           .\libjpeg.exe /S
           npm install -g node-gyp@8
           npm prefix -g | % {npm config set node_gyp "$_\node_modules\node-gyp\bin\node-gyp.js"}
+
+      - name: windows-arm64-dependencies
+        if: matrix.os == 'windows-11-arm'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: true
+          install: >-
+            mingw-w64-clang-aarch64-cairo
+            mingw-w64-clang-aarch64-pango
+            mingw-w64-clang-aarch64-libpng
+            mingw-w64-clang-aarch64-libjpeg-turbo
+            mingw-w64-clang-aarch64-giflib
+            mingw-w64-clang-aarch64-librsvg
+            mingw-w64-clang-aarch64-pkg-config
+            mingw-w64-clang-aarch64-binutils
+            mingw-w64-clang-aarch64-glib2
+            mingw-w64-clang-aarch64-fontconfig
+            mingw-w64-clang-aarch64-libxml2
+
+      - name: Generate .lib files for Windows ARM64
+        if: matrix.os == 'windows-11-arm'
+        shell: msys2 {0}
+        run: |
+          deps="cairo-2 png16-16 jpeg-8 pango-1.0-0 pangocairo-1.0-0 gobject-2.0-0 glib-2.0-0 turbojpeg gif-7 freetype-6 rsvg-2-2"
+          for lib in $deps; do
+            echo "Generating .lib for lib$lib.dll"
+            gendef "/clangarm64/bin/lib$lib.dll"
+            dlltool -d "lib$lib.dll.def" -l "/clangarm64/lib/lib$lib.lib"
+            rm "lib$lib.dll.def"
+            echo "Created lib$lib.lib"
+          done
+
       - name: Install corepack
         run: corepack enable && corepack prepare yarn@4.6.0 --activate
 
@@ -120,7 +153,9 @@ jobs:
       - name: Build canvas for Windows ARM64
         if: matrix.os == 'windows-11-arm'
         run: |
-          cd node_modules/canvas && node-gyp rebuild --arch=arm64 && cd ../..
+          npm install -g node-gyp@8
+          npm config set node_gyp "$(npm prefix -g)/node_modules/node-gyp/bin/node-gyp.js"
+          cd node_modules/canvas && node-gyp rebuild && cd ../..
 
       - name: Build Windows x64
         if: matrix.os == 'windows-latest'
