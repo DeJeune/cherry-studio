@@ -55,7 +55,7 @@ jobs:
         run: |
           sudo apt-get install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
       - name: windows-latest dependencies fix
-        if: matrix.os == 'windows-latest' || matrix.os == 'windows-11-arm'
+        if: matrix.os == 'windows-latest'
         run: |
           Invoke-WebRequest "https://ftp.gnome.org/pub/GNOME/binaries/win64/gtk+/2.22/gtk+-bundle_2.22.1-20101229_win64.zip" -OutFile "gtk.zip"
           Expand-Archive gtk.zip -DestinationPath "C:\GTK"
@@ -63,7 +63,6 @@ jobs:
           .\libjpeg.exe /S
           npm install -g node-gyp@8
           npm prefix -g | % {npm config set node_gyp "$_\node_modules\node-gyp\bin\node-gyp.js"}
-
       - name: windows-arm64-dependencies
         if: matrix.os == 'windows-11-arm'
         uses: msys2/setup-msys2@v2
@@ -82,6 +81,7 @@ jobs:
             mingw-w64-clang-aarch64-glib2
             mingw-w64-clang-aarch64-fontconfig
             mingw-w64-clang-aarch64-libxml2
+            mingw-w64-clang-aarch64-freetype
 
       - name: Generate .lib files for Windows ARM64
         if: matrix.os == 'windows-11-arm'
@@ -89,9 +89,13 @@ jobs:
         run: |
           deps="cairo-2 png16-16 jpeg-8 pango-1.0-0 pangocairo-1.0-0 gobject-2.0-0 glib-2.0-0 turbojpeg gif-7 freetype-6 rsvg-2-2"
           for lib in $deps; do
-            echo "Generating .lib for lib$lib.dll"
-            gendef "/clangarm64/bin/lib$lib.dll"
-            dlltool -d "lib$lib.dll.def" -l "/clangarm64/lib/lib$lib.lib"
+            echo "--- Generating .lib for lib$lib.dll ---"
+            if [ ! -f "/clangarm64/bin/lib$lib.dll" ]; then
+              echo "!!! /clangarm64/bin/lib$lib.dll not found, skipping."
+              continue
+            fi
+            /clangarm64/bin/gendef "/clangarm64/bin/lib$lib.dll"
+            /clangarm64/bin/dlltool -d "lib$lib.dll.def" -l "/clangarm64/lib/lib$lib.lib"
             rm "lib$lib.dll.def"
             echo "Created lib$lib.lib"
           done
@@ -152,6 +156,7 @@ jobs:
 
       - name: Build canvas for Windows ARM64
         if: matrix.os == 'windows-11-arm'
+        shell: msys2 {0}
         run: |
           npm install -g node-gyp@8
           npm config set node_gyp "$(npm prefix -g)/node_modules/node-gyp/bin/node-gyp.js"
