@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest, windows-11-arm]
       fail-fast: false
 
     steps:
@@ -118,15 +118,26 @@ jobs:
           cd node_modules/canvas && node-gyp rebuild --arch=x64 && cd ../..
 
       - name: Build canvas for Windows ARM64
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-11-arm'
         run: |
           cd node_modules/canvas && node-gyp rebuild --arch=arm64 && cd ../..
 
-      - name: Build Windows
+      - name: Build Windows x64
         if: matrix.os == 'windows-latest'
         run: |
           yarn build:npm windows
-          yarn build:win
+          yarn build:win:x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RENDERER_VITE_AIHUBMIX_SECRET: ${{ vars.RENDERER_VITE_AIHUBMIX_SECRET }}
+          NODE_OPTIONS: --max-old-space-size=8192
+          MAIN_VITE_MINERU_API_KEY: ${{ vars.MAIN_VITE_MINERU_API_KEY }}
+
+      - name: Build Windows ARM64
+        if: matrix.os == 'windows-11-arm'
+        run: |
+          yarn build:npm windows
+          yarn build:win:arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RENDERER_VITE_AIHUBMIX_SECRET: ${{ vars.RENDERER_VITE_AIHUBMIX_SECRET }}
