@@ -82,7 +82,23 @@ jobs:
             mingw-w64-clang-aarch64-fontconfig
             mingw-w64-clang-aarch64-libxml2
             mingw-w64-clang-aarch64-freetype
-            mingw-w64-cross-mingwarm64-tools
+
+      - name: Generate .lib files for Windows ARM64
+        if: matrix.os == 'windows-11-arm'
+        shell: msys2 {0}
+        run: |
+          deps="cairo-2 png16-16 jpeg-8 pango-1.0-0 pangocairo-1.0-0 gobject-2.0-0 glib-2.0-0 turbojpeg gif-7 freetype-6 rsvg-2-2"
+          for lib in $deps; do
+            echo "--- Generating .lib for lib$lib.dll ---"
+            if [ ! -f "/bin/lib$lib.dll" ]; then
+              echo "!!! /bin/lib$lib.dll not found, skipping."
+              continue
+            fi
+            /bin/gendef "/bin/lib$lib.dll"
+            /bin/dlltool -d "lib$lib.dll.def" -l "/lib/lib$lib.lib"
+            rm "lib$lib.dll.def"
+            echo "Created lib$lib.lib"
+          done
 
       - name: Install corepack
         run: corepack enable && corepack prepare yarn@4.6.0 --activate
@@ -142,6 +158,8 @@ jobs:
         if: matrix.os == 'windows-11-arm'
         shell: msys2 {0}
         run: |
+          export PKG_CONFIG_PATH="/lib/pkgconfig"
+          export PATH="/bin:$PATH"
           npm install -g node-gyp@8
           npm config set node_gyp "$(npm prefix -g)/node_modules/node-gyp/bin/node-gyp.js"
           cd node_modules/canvas && node-gyp rebuild && cd ../..
