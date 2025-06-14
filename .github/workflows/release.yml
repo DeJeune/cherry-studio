@@ -82,6 +82,7 @@ jobs:
             mingw-w64-clang-aarch64-fontconfig
             mingw-w64-clang-aarch64-libxml2
             mingw-w64-clang-aarch64-freetype
+            mingw-w64-cross-mingwarm64-tools
 
       - name: Generate .lib files for Windows ARM64
         if: matrix.os == 'windows-11-arm'
