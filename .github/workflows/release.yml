@@ -82,7 +82,6 @@ jobs:
             mingw-w64-clang-aarch64-fontconfig
             mingw-w64-clang-aarch64-libxml2
             mingw-w64-clang-aarch64-freetype
-
       - name: Generate .lib files for Windows ARM64
         if: matrix.os == 'windows-11-arm'
         shell: msys2 {0}
@@ -90,12 +89,12 @@ jobs:
           deps="cairo-2 png16-16 jpeg-8 pango-1.0-0 pangocairo-1.0-0 gobject-2.0-0 glib-2.0-0 turbojpeg gif-7 freetype-6 rsvg-2-2"
           for lib in $deps; do
             echo "--- Generating .lib for lib$lib.dll ---"
-            if [ ! -f "/bin/lib$lib.dll" ]; then
-              echo "!!! /bin/lib$lib.dll not found, skipping."
+            if [ ! -f "lib$lib.dll" ]; then
+              echo "!!! lib$lib.dll not found, skipping."
               continue
             fi
-            /bin/gendef "/bin/lib$lib.dll"
-            /bin/dlltool -d "lib$lib.dll.def" -l "/lib/lib$lib.lib"
+            gendef "lib$lib.dll"
+            dlltool -d "lib$lib.dll.def" -l "lib$lib.lib"
             rm "lib$lib.dll.def"
             echo "Created lib$lib.lib"
           done
@@ -117,7 +116,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install Dependencies
+      - name: Install Dependencies for Windows x64
+        if: matrix.os == 'windows-latest'
+        run: |
+          yarn install
+
+      - name: Install Dependencies for Windows ARM64
+        if: matrix.os == 'windows-11-arm'
+        shell: msys2 {0}
+        run: |
+          yarn install
+      - name: Install Dependencies for other platforms
         run: yarn install
 
       - name: Build Linux
