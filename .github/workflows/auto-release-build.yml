@@ -53,7 +53,7 @@ jobs:
         env:
           BRANCH: ${{ github.event.workflow_run.head_branch }}
           CI_SHA: ${{ github.event.workflow_run.head_sha }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_WRITE }}
           REPO: ${{ github.repository }}
         run: |
           export LC_ALL=C
