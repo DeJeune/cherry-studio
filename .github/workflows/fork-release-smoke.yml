@@ -1,0 +1,29 @@
+name: Fork Release Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  credentials:
+    if: github.repository == 'DeJeune/cherry-studio' && github.ref == 'refs/heads/fork-release-test-20316'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify fork credential access
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.TOKEN_GITHUB_WRITE }}
+          script: |
+            const repo = { owner: 'DeJeune', repo: 'cherry-studio' }
+            const repository = (await github.rest.repos.get(repo)).data
+            if (repository.full_name !== 'DeJeune/cherry-studio') throw new Error('Unexpected test repository')
+            await github.rest.pulls.list({ ...repo, state: 'open', per_page: 1 })
+            await github.rest.actions.listRepoWorkflows({ ...repo, per_page: 1 })
+            const ref = `refs/heads/fork-release-credential-probe-${context.runId}`
+            await github.rest.git.createRef({ ...repo, ref, sha: context.sha })
+            await github.rest.git.deleteRef({ ...repo, ref: ref.slice(5) })
+            core.summary.addHeading('Fork credential smoke test')
+              .addRaw('Passed: repository access, pull request read, Actions read, branch create/delete. PR and label writes are verified by the subsequent backport test.')
+            await core.summary.write()
