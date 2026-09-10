@@ -1,0 +1,43 @@
+name: Commitlint
+
+permissions:
+  contents: read
+
+on:
+  pull_request_target:
+    branches:
+      - fork-release-test-20316
+      - develop
+      - v2
+      - "release/v*"
+      - "release/*.x"
+    types: [opened, edited, reopened, ready_for_review, synchronize]
+
+jobs:
+  pull-request-title:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Install dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/commitlint-deps" --ignore-scripts --no-audit --no-fund @commitlint/cli@21.2.2 @commitlint/config-conventional@21.2.2
+          echo "NODE_PATH=$RUNNER_TEMP/commitlint-deps/node_modules" >> "$GITHUB_ENV"
+
+      - name: Validate pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | node "$RUNNER_TEMP/commitlint-deps/node_modules/@commitlint/cli/cli.js"
