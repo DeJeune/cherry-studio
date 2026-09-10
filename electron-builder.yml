@@ -179,7 +179,7 @@ artifactBuildCompleted: scripts/artifact-build-completed.js
 releaseInfo:
   releaseNotes: |
     <!--LANG:en-->
-    FORK SMOKE TEST ONLY: 99.1.5. Not an application release.
+    FORK SMOKE TEST ONLY: 99.2.0-beta.1. Not an application release.
     <!--LANG:zh-CN-->
-    仅用于 fork 流程测试：99.1.5，不是应用发布。
+    仅用于 fork 流程测试：99.2.0-beta.1，不是应用发布。
     <!--LANG:END-->
