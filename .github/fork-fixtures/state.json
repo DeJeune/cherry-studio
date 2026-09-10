@@ -1,5 +1,5 @@
 {
   "clean": 0,
-  "conflict": "previous-line",
+  "conflict": "fixed",
   "pending": 0
 }
