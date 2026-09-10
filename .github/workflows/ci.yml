@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [fork-release-test-20316, 'release/99.*.x']
+  pull_request:
+    branches: [fork-release-test-20316, 'release/99.*.x']
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Fixture sanity (NOT full application CI)
+    if: github.repository == 'DeJeune/cherry-studio'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: node -e "JSON.parse(require('fs').readFileSync('.github/fork-fixtures/state.json')); JSON.parse(require('fs').readFileSync('package.json'))"

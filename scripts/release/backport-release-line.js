@@ -150,7 +150,7 @@ async function reconcileLineBackport({ github, repo, source, line, retry = false
   if (config.mode !== 'minor-line') return { status: 'disabled' }
   const getSource = async () => (await github.rest.pulls.get({ ...repo, pull_number: source })).data
   const pr = await getSource()
-  if (pr.base.ref !== 'main' || !pr.merged_at) return { status: 'unmerged' }
+  if (pr.base.ref !== 'fork-release-test-20316' || !pr.merged_at) return { status: 'unmerged' }
   const existing = await findBackport(github, repo, source, line)
   if (existing) {
     let current = (await github.rest.pulls.get({ ...repo, pull_number: existing.number })).data
@@ -176,7 +176,7 @@ async function reconcileLineBackport({ github, repo, source, line, retry = false
     const releaseSha = await findRef(github, repo, releaseBranch)
     if (!releaseSha) throw new Error(`Missing release branch ${releaseBranch}`)
     const branchSha = await findRef(github, repo, branch)
-    git(cwd, 'fetch', 'origin', 'refs/heads/main:refs/remotes/origin/main', `refs/heads/${releaseBranch}`)
+    git(cwd, 'fetch', 'origin', 'refs/heads/fork-release-test-20316:refs/remotes/origin/fork-release-test-20316', `refs/heads/${releaseBranch}`)
     if (branchSha) git(cwd, 'fetch', 'origin', `refs/heads/${branch}`)
     let baseSha = branchSha || releaseSha
     let recovered = null
@@ -204,7 +204,7 @@ async function reconcileLineBackport({ github, repo, source, line, retry = false
       const latest = await getSource()
       if (
         !latest.merged_at ||
-        latest.base.ref !== 'main' ||
+        latest.base.ref !== 'fork-release-test-20316' ||
         latest.merge_commit_sha !== pr.merge_commit_sha ||
         !latest.labels.some((label) => label.name === `target/${line}`)
       )

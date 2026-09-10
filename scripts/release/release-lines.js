@@ -99,7 +99,7 @@ async function planLineBackports({ github, context, inputs = {} }) {
   const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number })
   const identity = backportIdentity(pr, `${context.repo.owner}/${context.repo.repo}`)
   if (!manual && identity) return { mode: config.mode, targets: [{ ...identity, retry: false }] }
-  if (pr.base.ref !== 'main' || !pr.merged_at) return { mode: config.mode, targets: [] }
+  if (pr.base.ref !== 'fork-release-test-20316' || !pr.merged_at) return { mode: config.mode, targets: [] }
   const lines = manual
     ? [inputs.line]
     : pr.labels

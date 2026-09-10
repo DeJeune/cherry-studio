@@ -1,6 +1,6 @@
 {
-  "mode": "exact-version",
-  "current": null,
-  "previous": null,
-  "candidate": null
+  "mode": "minor-line",
+  "current": "99.1.x",
+  "previous": "99.0.x",
+  "candidate": "99.2.x"
 }

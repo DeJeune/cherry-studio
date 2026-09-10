@@ -157,7 +157,7 @@ function applyBackportPatch({ cwd, mergeSha, patchBase, patchFile }) {
 }
 
 function prepareBackport({ cwd, mergeSha, prCommitCount, prNumber, patchFile, getAssociatedPullRequests }) {
-  if (!succeeds('git', ['merge-base', '--is-ancestor', mergeSha, 'origin/main'], cwd)) {
+  if (!succeeds('git', ['merge-base', '--is-ancestor', mergeSha, 'origin/fork-release-test-20316'], cwd)) {
     throw new Error(`Merged commit ${mergeSha} is not on origin/main`)
   }
 
