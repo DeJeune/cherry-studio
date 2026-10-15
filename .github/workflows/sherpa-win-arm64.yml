@@ -62,7 +62,7 @@ jobs:
           Set-Location sherpa/scripts/node-addon-api
           npm install --ignore-scripts --no-audit --no-fund --save-exact cmake-js@8.0.0 node-addon-api@8.3.0
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          $taskRc = (Get-Command rc.exe -ErrorAction Stop).Source
+          $taskRc = (Get-Command rc.exe -ErrorAction Stop).Source.Replace('\', '/')
           npx --no-install cmake-js compile --arch arm64 --generator Ninja --CDCMAKE_STATIC_LINKER_FLAGS=/machine:ARM64 "--CDCMAKE_RC_COMPILER=$taskRc"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Assemble runtime and inspect DLL dependencies
