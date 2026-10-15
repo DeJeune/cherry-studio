@@ -37,7 +37,7 @@ async function main() {
   })
   assert(audio.samples.length > audio.sampleRate)
   assert.equal(audio.sampleRate, 24000)
-  const host = process.versions.electron ? 'electron' : 'node'
+  const host = process.type === 'utility' ? 'electron' : 'node'
   sherpa.writeWave(path.resolve(`runtime/${host}-mixed.wav`), audio)
   const ttsMs = performance.now() - started
   const asrDirectory = path.resolve('.native-models/funasr-nano-int8')

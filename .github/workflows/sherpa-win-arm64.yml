@@ -29,6 +29,7 @@ jobs:
           repository: k2-fsa/sherpa-onnx
           ref: ${{ env.SHERPA_REVISION }}
           path: sherpa
+          sparse-checkout: scripts/node-addon-api
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -59,9 +60,9 @@ jobs:
           Set-Content -LiteralPath $taskCmakePath -Value $taskCmake -Encoding utf8NoBOM
           $env:SHERPA_ONNX_INSTALL_DIR = "$env:GITHUB_WORKSPACE/sherpa-install"
           Set-Location sherpa/scripts/node-addon-api
-          npm install --ignore-scripts --no-audit --no-fund --save-exact cmake-js@7.3.0 node-addon-api@8.3.0
+          npm install --ignore-scripts --no-audit --no-fund --save-exact cmake-js@8.0.0 node-addon-api@8.3.0
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          npx --no-install cmake-js compile --arch arm64 --generator 'Visual Studio 17 2022' --CDCMAKE_STATIC_LINKER_FLAGS=/machine:ARM64
+          npx --no-install cmake-js compile --arch arm64 --generator Ninja --CDCMAKE_STATIC_LINKER_FLAGS=/machine:ARM64
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Assemble runtime and inspect DLL dependencies
         run: |
@@ -99,8 +100,12 @@ jobs:
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE/runtime;$env:PATH"
           $taskElectron = node -p "require('./smoke/node_modules/electron')"
-          & $taskElectron scripts/voice-runtime-smoke/sherpa-arm64-electron.cjs
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $taskProcess = Start-Process -FilePath $taskElectron -ArgumentList scripts/voice-runtime-smoke/sherpa-arm64-electron.cjs -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput runtime/electron-stdout.log -RedirectStandardError runtime/electron-stderr.log
+          Get-Content runtime/electron-stdout.log
+          Get-Content runtime/electron-stderr.log
+          if ($taskProcess.ExitCode) { exit $taskProcess.ExitCode }
+          $taskResult = Get-Content runtime/electron-result.json -Raw | ConvertFrom-Json
+          if ($taskResult.host -ne 'electron' -or $taskResult.arch -ne 'arm64') { throw 'Electron inference result missing' }
       - name: Package the verified runtime
         run: |
           $taskFiles = @(Get-ChildItem runtime -File | Where-Object { $_.Extension -in '.node','.dll' -or $_.Name -in 'LICENSE','build-info.json' } | ForEach-Object { 'runtime/' + $_.Name })
