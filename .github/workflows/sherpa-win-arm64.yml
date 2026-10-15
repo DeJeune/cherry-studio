@@ -56,6 +56,7 @@ jobs:
           $taskCmakePath = 'sherpa/scripts/node-addon-api/CMakeLists.txt'
           $taskCmake = Get-Content -LiteralPath $taskCmakePath -Raw
           $taskCmake = $taskCmake -replace '(?m)^  -Wl,-rpath,.*\r?\n', ''
+          $taskCmake += "`ntarget_link_libraries(sherpa-onnx delayimp)`n"
           Set-Content -LiteralPath $taskCmakePath -Value $taskCmake -Encoding utf8NoBOM
           $env:SHERPA_ONNX_INSTALL_DIR = "$env:GITHUB_WORKSPACE/sherpa-install"
           Set-Location sherpa/scripts/node-addon-api
@@ -67,14 +68,14 @@ jobs:
       - name: Assemble runtime and inspect DLL dependencies
         run: |
           New-Item -ItemType Directory runtime | Out-Null
-          Copy-Item sherpa/scripts/node-addon-api/build/Release/sherpa-onnx.node runtime/
+          Copy-Item sherpa/scripts/node-addon-api/build/sherpa-onnx.node runtime/
           Copy-Item sherpa-install/lib/*.dll runtime/
           Copy-Item sherpa/LICENSE runtime/LICENSE
           Get-ChildItem runtime -File | Where-Object Extension -In '.node','.dll' | ForEach-Object {
             dumpbin /headers $_.FullName
             dumpbin /dependents $_.FullName
           } *> runtime/dependencies.txt
-          @{ sourceRevision = $env:SHERPA_REVISION; sdkSha256 = '833488fec6fbdcc221b600d2304d0af1ebd8bb7dbbeebd111e00da6a8da4cf4d'; platform = 'win32-arm64'; node = (node --version); patch = 'remove ELF rpath flags for MSVC' } |
+          @{ sourceRevision = $env:SHERPA_REVISION; sdkSha256 = '833488fec6fbdcc221b600d2304d0af1ebd8bb7dbbeebd111e00da6a8da4cf4d'; platform = 'win32-arm64'; node = (node --version); patch = 'remove ELF rpath flags and link MSVC delayimp' } |
             ConvertTo-Json | Set-Content runtime/build-info.json
       - name: Install the matching JavaScript wrapper and Electron
         run: |
