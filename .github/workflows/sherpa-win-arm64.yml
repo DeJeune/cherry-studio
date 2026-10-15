@@ -45,9 +45,9 @@ jobs:
           Get-Command cl | Format-List Source
       - name: Verify and extract the official ARM64 SDK
         run: |
-          $taskSdk = 'sherpa-onnx-v1.13.6-win-arm64-shared-MD-Release.tar.bz2'
+          $taskSdk = 'sherpa-onnx-v1.13.6-win-arm64-shared-MT-Release.tar.bz2'
           Invoke-WebRequest "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/$taskSdk" -OutFile $taskSdk
-          if ((Get-FileHash $taskSdk -Algorithm SHA256).Hash.ToLower() -ne '833488fec6fbdcc221b600d2304d0af1ebd8bb7dbbeebd111e00da6a8da4cf4d') { throw 'SDK checksum mismatch' }
+          if ((Get-FileHash $taskSdk -Algorithm SHA256).Hash.ToLower() -ne '8298636d8db917ca399e0c6c76152c9c19a6d29d17684965fd281e2295ca067d') { throw 'SDK checksum mismatch' }
           New-Item -ItemType Directory sherpa-install | Out-Null
           tar -xjf $taskSdk -C sherpa-install --strip-components 1
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -63,7 +63,7 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund --save-exact cmake-js@8.0.0 node-addon-api@8.3.0
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $taskRc = (Get-Command rc.exe -ErrorAction Stop).Source.Replace('\', '/')
-          npx --no-install cmake-js compile --arch arm64 --generator Ninja --CDCMAKE_STATIC_LINKER_FLAGS=/machine:ARM64 "--CDCMAKE_RC_COMPILER=$taskRc"
+          npx --no-install cmake-js compile --arch arm64 --generator Ninja --CDCMAKE_STATIC_LINKER_FLAGS=/machine:ARM64 --CDCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "--CDCMAKE_RC_COMPILER=$taskRc"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Assemble runtime and inspect DLL dependencies
         run: |
@@ -75,14 +75,16 @@ jobs:
             dumpbin /headers $_.FullName
             dumpbin /dependents $_.FullName
           } *> runtime/dependencies.txt
-          @{ sourceRevision = $env:SHERPA_REVISION; sdkSha256 = '833488fec6fbdcc221b600d2304d0af1ebd8bb7dbbeebd111e00da6a8da4cf4d'; platform = 'win32-arm64'; node = (node --version); patch = 'remove ELF rpath flags and link MSVC delayimp' } |
+          @{ sourceRevision = $env:SHERPA_REVISION; sdkSha256 = '8298636d8db917ca399e0c6c76152c9c19a6d29d17684965fd281e2295ca067d'; platform = 'win32-arm64'; crt = 'MT'; node = (node --version); patch = 'remove ELF rpath flags and link MSVC delayimp' } |
             ConvertTo-Json | Set-Content runtime/build-info.json
       - name: Install the matching JavaScript wrapper and Electron
         run: |
           $taskElectron = (Get-Content package.json -Raw | ConvertFrom-Json).devDependencies.electron
-          npm install --prefix smoke --omit=optional --no-audit --no-fund sherpa-onnx-node@1.13.6 "electron@$taskElectron" tsx@4.20.3
+          npm install --prefix smoke --ignore-scripts --no-audit --no-fund sherpa-onnx-node@1.13.6 "electron@$taskElectron" tsx@4.20.3
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          git apply --directory=smoke/node_modules/sherpa-onnx-node patches/sherpa-onnx-node@1.13.6.patch
+          git apply --unidiff-zero --directory=smoke/node_modules/sherpa-onnx-node patches/sherpa-onnx-node@1.13.6.patch
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node smoke/node_modules/electron/install.js
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/cache@v4
         with:
@@ -101,7 +103,7 @@ jobs:
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE/runtime;$env:PATH"
           $taskElectron = node -p "require('./smoke/node_modules/electron')"
-          $taskProcess = Start-Process -FilePath $taskElectron -ArgumentList scripts/voice-runtime-smoke/sherpa-arm64-electron.cjs -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput runtime/electron-stdout.log -RedirectStandardError runtime/electron-stderr.log
+          $taskProcess = Start-Process -FilePath $taskElectron -ArgumentList scripts/voice-runtime-smoke/sherpa-arm64-electron.cjs -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput runtime/electron-stdout.log -RedirectStandardError runtime/electron-stderr.log
           Get-Content runtime/electron-stdout.log
           Get-Content runtime/electron-stderr.log
           if ($taskProcess.ExitCode) { exit $taskProcess.ExitCode }
