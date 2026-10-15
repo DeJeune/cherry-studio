@@ -1,0 +1,118 @@
+name: Sherpa Windows ARM64 experiment
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/sherpa-win-arm64-ci]
+    paths:
+      - .github/workflows/sherpa-win-arm64.yml
+      - scripts/voice-runtime-smoke/sherpa-arm64-*
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-11-arm
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      SHERPA_REVISION: 1cb484af5e69d3c7803c1eb0b3b5ab8041e0e911
+      CHERRY_SHERPA_ONNX_BINDING_PATH: ${{ github.workspace }}\runtime\sherpa-onnx.node
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: k2-fsa/sherpa-onnx
+          ref: ${{ env.SHERPA_REVISION }}
+          path: sherpa
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          architecture: arm64
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+      - name: Verify native tools
+        run: |
+          node -e "if(process.platform!=='win32'||process.arch!=='arm64')throw Error('Native ARM64 Node required');process.stdout.write(JSON.stringify(process.versions))"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --version
+          Get-Command cl | Format-List Source
+      - name: Verify and extract the official ARM64 SDK
+        run: |
+          $taskSdk = 'sherpa-onnx-v1.13.6-win-arm64-shared-MD-Release.tar.bz2'
+          Invoke-WebRequest "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/$taskSdk" -OutFile $taskSdk
+          if ((Get-FileHash $taskSdk -Algorithm SHA256).Hash.ToLower() -ne '833488fec6fbdcc221b600d2304d0af1ebd8bb7dbbeebd111e00da6a8da4cf4d') { throw 'SDK checksum mismatch' }
+          New-Item -ItemType Directory sherpa-install | Out-Null
+          tar -xjf $taskSdk -C sherpa-install --strip-components 1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build Node-API binding
+        run: |
+          $taskCmakePath = 'sherpa/scripts/node-addon-api/CMakeLists.txt'
+          $taskCmake = Get-Content -LiteralPath $taskCmakePath -Raw
+          $taskCmake = $taskCmake -replace '(?m)^  -Wl,-rpath,.*\r?\n', ''
+          Set-Content -LiteralPath $taskCmakePath -Value $taskCmake -Encoding utf8NoBOM
+          $env:SHERPA_ONNX_INSTALL_DIR = "$env:GITHUB_WORKSPACE/sherpa-install"
+          Set-Location sherpa/scripts/node-addon-api
+          npm install --ignore-scripts --no-audit --no-fund --save-exact cmake-js@7.3.0 node-addon-api@8.3.0
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npx --no-install cmake-js compile --arch arm64 --generator 'Visual Studio 17 2022' --CDCMAKE_STATIC_LINKER_FLAGS=/machine:ARM64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Assemble runtime and inspect DLL dependencies
+        run: |
+          New-Item -ItemType Directory runtime | Out-Null
+          Copy-Item sherpa/scripts/node-addon-api/build/Release/sherpa-onnx.node runtime/
+          Copy-Item sherpa-install/lib/*.dll runtime/
+          Copy-Item sherpa/LICENSE runtime/LICENSE
+          Get-ChildItem runtime -File | Where-Object Extension -In '.node','.dll' | ForEach-Object {
+            dumpbin /headers $_.FullName
+            dumpbin /dependents $_.FullName
+          } *> runtime/dependencies.txt
+          @{ sourceRevision = $env:SHERPA_REVISION; sdkSha256 = '833488fec6fbdcc221b600d2304d0af1ebd8bb7dbbeebd111e00da6a8da4cf4d'; platform = 'win32-arm64'; node = (node --version); patch = 'remove ELF rpath flags for MSVC' } |
+            ConvertTo-Json | Set-Content runtime/build-info.json
+      - name: Install the matching JavaScript wrapper and Electron
+        run: |
+          $taskElectron = (Get-Content package.json -Raw | ConvertFrom-Json).devDependencies.electron
+          npm install --prefix smoke --omit=optional --no-audit --no-fund sherpa-onnx-node@1.13.6 "electron@$taskElectron" tsx@4.20.3
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git apply --directory=smoke/node_modules/sherpa-onnx-node patches/sherpa-onnx-node@1.13.6.patch
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/cache@v4
+        with:
+          path: .native-models
+          key: sherpa-arm64-models-${{ hashFiles('src/main/ai/localModel/catalog/catalog.ts', 'src/main/ai/localModel/catalog/kokoro-v1.1.json') }}
+      - name: Download and verify the application models
+        run: |
+          ./smoke/node_modules/.bin/tsx.cmd --tsconfig tsconfig.node.json scripts/voice-runtime-smoke/sherpa-arm64-models.ts
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Run native Node ASR and TTS
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE/runtime;$env:PATH"
+          node scripts/voice-runtime-smoke/sherpa-arm64-smoke.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Run ASR and TTS in an Electron utility process
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE/runtime;$env:PATH"
+          $taskElectron = node -p "require('./smoke/node_modules/electron')"
+          & $taskElectron scripts/voice-runtime-smoke/sherpa-arm64-electron.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Package the verified runtime
+        run: |
+          $taskFiles = @(Get-ChildItem runtime -File | Where-Object { $_.Extension -in '.node','.dll' -or $_.Name -in 'LICENSE','build-info.json' } | ForEach-Object { 'runtime/' + $_.Name })
+          tar -czf sherpa-onnx-1.13.6-win-arm64.tgz @taskFiles
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          (Get-FileHash sherpa-onnx-1.13.6-win-arm64.tgz -Algorithm SHA256).Hash.ToLower() |
+            Set-Content sherpa-onnx-1.13.6-win-arm64.tgz.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sherpa-onnx-1.13.6-win-arm64
+          path: |
+            runtime/
+            sherpa-onnx-1.13.6-win-arm64.tgz*
+          if-no-files-found: warn
