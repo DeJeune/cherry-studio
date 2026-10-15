@@ -29,7 +29,6 @@ jobs:
           repository: k2-fsa/sherpa-onnx
           ref: ${{ env.SHERPA_REVISION }}
           path: sherpa
-          sparse-checkout: scripts/node-addon-api
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
